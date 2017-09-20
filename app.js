@@ -5,10 +5,14 @@ var express = require('express');
 var path = require('path');
 var favicon = require('serve-favicon');
 var bodyParser = require('body-parser');
-
+var session = require("express-session");
 var logger = require('morgan');
 
+var passport = require('passport');
+var LocalStrategy = require('passport-local').Strategy;
+
 var index = require('./routes/index');
+var keys = require('./routes/keys');
 
 var app = express();
 
@@ -19,11 +23,42 @@ app.set('view engine', 'twig');
 // uncomment after placing your favicon in /public
 //app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
 app.use(logger('dev'));
+app.use(session({ secret: "cats" }));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(passport.initialize());
+app.use(passport.session());
 
 app.use('/', index);
+app.use('/keys', keys);
+
+passport.serializeUser(function(user, done) {
+  done(null, user);
+});
+
+passport.deserializeUser(function(user, done) {
+  done(null, user);
+});
+passport.use(new LocalStrategy(function(username, password, done) {
+  process.nextTick(function() {
+    if (username === 'admin' && password === 'admin') {
+      return done(null, { 'username': 'admin' });
+    }
+
+    return done(null, false);
+  });
+}));
+app.post('/login',
+  passport.authenticate('local', {
+    successRedirect: '/keys',
+    failureRedirect: '/'
+  })
+);
+app.get('/logout', function(req, res){
+  req.logout();
+  res.redirect('/');
+});
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
@@ -64,7 +99,6 @@ server.on('listening', onListening);
 /**
  * Event listener for HTTP server "error" event.
  */
-
 function onError(error) {
   if (error.syscall !== 'listen') {
     throw error;
@@ -92,7 +126,6 @@ function onError(error) {
 /**
  * Event listener for HTTP server "listening" event.
  */
-
 function onListening() {
   var addr = server.address();
   var bind = typeof addr === 'string'
